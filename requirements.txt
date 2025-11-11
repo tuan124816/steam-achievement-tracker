@@ -1,0 +1,18 @@
+# Core dependencies
+pandas>=2.2.0
+requests>=2.31.0
+beautifulsoup4>=4.12.2
+lxml>=4.9.3
+
+# Excel export
+XlsxWriter>=3.1.2
+
+# Selenium for private profile scraping
+selenium>=4.13.0
+
+# Utility
+tqdm>=4.66.1
+
+# Optional: for typing hints & better dev experience
+types-requests
+types-beautifulsoup4

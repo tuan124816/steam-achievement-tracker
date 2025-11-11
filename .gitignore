@@ -1,0 +1,42 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# --- Virtual Environment ---
+.venv/
+venv/
+env/
+ENV/
+mlpvenv/
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# --- OS ---
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Logs & Reports ---
+*.log
+*.csv
+*.tmp
+*.bak
+
+# --- Steam Cookies & Private Info ---
+steam_cookies.pkl
+tracker/steam_cookies.pkl
+config.json
+notebooks/
+
+# --- Build / Output Files ---
+*.xlsx
+*.xls
+output/
+exports/
