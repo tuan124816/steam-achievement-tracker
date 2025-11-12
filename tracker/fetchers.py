@@ -1,3 +1,15 @@
+"""
+fetchers.py
+------------
+Handles all data-fetching operations for the Steam Achievement Tracker project.
+
+Includes:
+- Steam Web API calls for game schemas and player achievement data.
+- Selenium + BeautifulSoup scraping for locked/private profiles.
+- Automatic cookie-based login for Selenium sessions.
+- Self-test mode for verifying API/Selenium functionality.
+"""
+
 import time
 import pickle
 import requests
@@ -6,11 +18,29 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from .constants import HEADERS, API_SLEEP, HTML_SLEEP
 
+
 def fetch_schema(api_key, app_id):
+    """
+    Fetch the achievement schema for a game from Steam Web API.
+
+    Args:
+        api_key (str): Steam Web API key.
+        app_id (int): Steam App ID.
+
+    Returns:
+        list[dict]: Each dict contains:
+            {
+                "apiname": internal API name,
+                "displayName": player-visible name,
+                "description": achievement description
+            }
+    """
     url = f"https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key={api_key}&appid={app_id}"
     r = requests.get(url, headers=HEADERS, timeout=20)
     r.raise_for_status()
     data = r.json()
+
+    # Extract the list of achievements from the schema
     ach_list = data.get("game", {}).get("availableGameStats", {}).get("achievements", [])
     return [
         {"apiname": a.get("name", "").strip(),
@@ -19,9 +49,22 @@ def fetch_schema(api_key, app_id):
         for a in ach_list
     ]
 
+
 def fetch_player_api(api_key, app_id, steamid):
+    """
+    Fetch a user's achievement data for a given game using the Steam API.
+
+    Args:
+        api_key (str): Steam Web API key.
+        app_id (int): Steam App ID.
+        steamid (str): Steam user ID (64-bit numeric).
+
+    Returns:
+        dict: {apiname: achieved_flag}, where achieved_flag ∈ {0, 1}.
+    """
     url = (f"https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/"
-           f"?appid={app_id}&key={api_key}&steamid={steamid}")
+           f"?appid={app_id}&key={api_key}&steamid={steamid}"
+           )
     r = requests.get(url, headers=HEADERS, timeout=20)
     if r.status_code != 200:
         return {}
@@ -29,13 +72,25 @@ def fetch_player_api(api_key, app_id, steamid):
     achs = data.get("playerstats", {}).get("achievements", [])
     return {a.get("apiname"): int(a.get("achieved", 0)) for a in achs}
 
+
 def create_logged_in_driver(cookie_file):
+    """
+    Create a headless Selenium Chrome driver and load stored Steam cookies.
+
+    Args:
+        cookie_file (str | Path): Path to a .pkl file containing saved cookies.
+
+    Returns:
+        selenium.webdriver.Chrome: A Chrome driver logged into Steam.
+    """
     opts = Options()
     opts.add_argument("--headless=new")
     driver = webdriver.Chrome(options=opts)
     driver.get("https://steamcommunity.com")
+
     time.sleep(2)
     cookies = pickle.load(open(cookie_file, "rb"))
+    # Inject cookies into session
     for c in cookies:
         if "steamcommunity" in c.get("domain", ""):
             try:
@@ -44,20 +99,50 @@ def create_logged_in_driver(cookie_file):
                 continue
     return driver
 
+
 def fetch_player_html_selenium(steamid, app_id, driver):
+    """
+    Fetch achievement unlocks from a user's Steam profile using Selenium.
+
+    Used when the Steam Web API fails (e.g., profile privacy issues).
+
+    Args:
+        steamid (str): Steam user ID.
+        app_id (int): Steam App ID.
+        driver (webdriver.Chrome): Logged-in Selenium driver.
+
+    Returns:
+        set[str]: Names of unlocked achievements (as displayed on page).
+    """
     url = f"https://steamcommunity.com/profiles/{steamid}/stats/{app_id}/achievements/"
     driver.get(url)
     time.sleep(3)
+
     soup = BeautifulSoup(driver.page_source, "html.parser")
     unlocked = set()
+
     for row in soup.select(".achieveRow"):
         title = row.select_one("h3.ellipsis")
         unlock = row.select_one(".achieveUnlockTime")
+
+        # If the element contains an unlock time, then achievement is earned
         if title and unlock and "Unlocked" in unlock.get_text():
             unlocked.add(title.get_text(strip=True))
     return unlocked
 
+
 if __name__ == "__main__":
+    """
+    Test mode: Run standalone from terminal to verify functionality.
+
+    Usage:
+        python -m tracker.fetchers
+
+    Behavior:
+        - Loads config (API key, AppID).
+        - Fetches schema & player data from API.
+        - Optionally tests Selenium with cookie-based login.
+    """
     from tracker.config import load_config
     from tracker.cookie_setup import generate_steam_cookies
     from pathlib import Path
