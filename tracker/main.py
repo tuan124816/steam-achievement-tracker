@@ -13,8 +13,6 @@ Handles:
 
 import time
 import pandas as pd
-from pathlib import Path
-from typing import Dict, Any, List
 from .utils import log, progress_bar
 from .fetchers import (
     fetch_schema, fetch_player_api,
@@ -30,7 +28,7 @@ if not COOKIE_FILE.exists():
     generate_steam_cookies(COOKIE_FILE)
 
 
-def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cookie_file: Path,) -> pd.DataFrame:
+def build_tracker(api_key, app_id, friends, cookie_file):
     """
     Build the main achievement tracking DataFrame.
 
@@ -99,7 +97,7 @@ def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cook
     return df
 
 
-def run_tracker(cfg: Dict[str, Any]) -> None:
+def run_tracker(cfg):
     """
     Main entrypoint for running the full achievement tracker.
 

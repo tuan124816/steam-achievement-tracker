@@ -10,10 +10,9 @@ Provides:
 
 from tqdm import tqdm
 from datetime import datetime
-from typing import Iterable, Iterator, Any
 
 
-def log(msg: str) -> None:
+def log(msg):
     """
     Print a timestamped log message to the console.
 
@@ -23,7 +22,7 @@ def log(msg: str) -> None:
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
 
 
-def progress_bar(iterable: Iterable[Any], desc: str = "Processing") -> Iterator[Any]:
+def progress_bar(iterable, desc="Processing"):
     """
     Wrap an iterable with a tqdm progress bar.
 

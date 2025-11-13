@@ -13,15 +13,13 @@ Includes:
 import time
 import pickle
 import requests
-from pathlib import Path
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from .constants import HEADERS, API_SLEEP, HTML_SLEEP
-from typing import Dict, Any, List, Set
 
 
-def fetch_schema(api_key: str, app_id: int) -> List[Dict[str, str]]:
+def fetch_schema(api_key, app_id):
     """
     Fetch the achievement schema for a game from Steam Web API.
 
@@ -52,7 +50,7 @@ def fetch_schema(api_key: str, app_id: int) -> List[Dict[str, str]]:
     ]
 
 
-def fetch_player_api(api_key: str, app_id: int, steamid: str) -> Dict[str, int]:
+def fetch_player_api(api_key, app_id, steamid):
     """
     Fetch a user's achievement data for a given game using the Steam API.
 
@@ -75,7 +73,7 @@ def fetch_player_api(api_key: str, app_id: int, steamid: str) -> Dict[str, int]:
     return {a.get("apiname"): int(a.get("achieved", 0)) for a in achs}
 
 
-def create_logged_in_driver(cookie_file: str | Path) -> webdriver.Chrome:
+def create_logged_in_driver(cookie_file):
     """
     Create a headless Selenium Chrome driver and load stored Steam cookies.
 
@@ -102,7 +100,7 @@ def create_logged_in_driver(cookie_file: str | Path) -> webdriver.Chrome:
     return driver
 
 
-def fetch_player_html_selenium(steamid: str, app_id: int, driver: webdriver.Chrome) -> Set[str]:
+def fetch_player_html_selenium(steamid, app_id, driver):
     """
     Fetch achievement unlocks from a user's Steam profile using Selenium.
 
