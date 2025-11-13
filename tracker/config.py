@@ -15,12 +15,13 @@ import json
 import re
 import argparse
 from pathlib import Path
+from typing import Dict, Any
 import requests
 
 # ========== Default Paths ==========
-ROOT_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_CONFIG = ROOT_DIR / "config.json"
-COOKIE_FILE = ROOT_DIR / "steam_cookies.pkl"
+ROOT_DIR: Path = Path(__file__).resolve().parents[1]
+DEFAULT_CONFIG: Path = ROOT_DIR / "config.json"
+COOKIE_FILE: Path = ROOT_DIR / "steam_cookies.pkl"
 
 
 # ========== Helper Functions ==========
@@ -46,7 +47,7 @@ def fetch_game_name(appid: int) -> str:
         return "Unknown Game"
 
 
-def load_config(default_path="config.json"):
+def load_config(default_path: str = "config.json") -> Dict[str, Any]:
     """
     Load configuration from a JSON file and optionally override via CLI arguments.
 
@@ -69,7 +70,7 @@ def load_config(default_path="config.json"):
     if not cfg_path.exists():
         raise FileNotFoundError(f"Config file not found: {cfg_path}")
 
-    config = json.loads(cfg_path.read_text(encoding="utf-8"))
+    config: Dict[str, Any] = json.loads(cfg_path.read_text(encoding="utf-8"))
 
     # Auto-detect AppID and fetch name
     if args.game:

@@ -17,11 +17,13 @@ Usage:
 import math
 import xlsxwriter
 import requests
+from typing import List, Dict, Any
 from io import BytesIO
 from PIL import Image
+import pandas as pd
 
 
-def export_styled_excel(df, friends, out_path):
+def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_path: str) -> None:
     """
     Export a styled Excel workbook containing all achievements and friends' progress.
 
