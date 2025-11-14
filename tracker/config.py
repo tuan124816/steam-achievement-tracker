@@ -15,6 +15,7 @@ import json
 import re
 import argparse
 from pathlib import Path
+from typing import Dict, Any
 import requests
 
 # ========== Default Paths ==========
@@ -46,7 +47,7 @@ def fetch_game_name(appid: int) -> str:
         return "Unknown Game"
 
 
-def load_config(default_path="config.json"):
+def load_config(default_path: str = "config.json") -> Dict[str, Any]:
     """
     Load configuration from a JSON file and optionally override via CLI arguments.
 

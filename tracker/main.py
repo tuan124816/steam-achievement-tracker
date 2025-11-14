@@ -13,6 +13,8 @@ Handles:
 
 import time
 import pandas as pd
+from pathlib import Path
+from typing import Dict, Any, List
 from .utils import log, progress_bar
 from .fetchers import (
     fetch_schema, fetch_player_api,
@@ -28,7 +30,7 @@ if not COOKIE_FILE.exists():
     generate_steam_cookies(COOKIE_FILE)
 
 
-def build_tracker(api_key, app_id, friends, cookie_file):
+def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cookie_file: Path,) -> pd.DataFrame:
     """
     Build the main achievement tracking DataFrame.
 
@@ -37,7 +39,7 @@ def build_tracker(api_key, app_id, friends, cookie_file):
     2. For each friend:
         - Try Steam API first.
         - If API fails (private profile or missing data), use Selenium fallback.
-    3. Populate the DataFrame with True/False for each user’s unlocked achievements.
+    3. Populate the DataFrame with True/False for each user's unlocked achievements.
 
     Args:
         api_key (str): Steam Web API key.
@@ -46,7 +48,7 @@ def build_tracker(api_key, app_id, friends, cookie_file):
         cookie_file (Path): Path to saved Steam cookies.
 
     Returns:
-        pandas.DataFrame: Achievement tracker with friends’ progress.
+        pandas.DataFrame: Achievement tracker with friends' progress.
     """
     # Fetch schema and build DataFrame structure
     schema = fetch_schema(api_key, app_id)
@@ -97,7 +99,7 @@ def build_tracker(api_key, app_id, friends, cookie_file):
     return df
 
 
-def run_tracker(cfg):
+def run_tracker(cfg: Dict[str, Any]) -> None:
     """
     Main entrypoint for running the full achievement tracker.
 
