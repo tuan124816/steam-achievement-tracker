@@ -102,7 +102,7 @@ def create_logged_in_driver(cookie_file: str | Path) -> webdriver.Chrome:
     return driver
 
 
-def fetch_player_html_selenium(steamid: str, app_id: int, driver: webdriver.Chrome) -> Set[str]:
+def fetch_player_html_selenium(steamid: str, app_id: int, driver: webdriver.Chrome, debug: bool = False) -> Set[str]:
     """
     Fetch achievement unlocks from a user's Steam profile using Selenium.
 
@@ -112,15 +112,26 @@ def fetch_player_html_selenium(steamid: str, app_id: int, driver: webdriver.Chro
         steamid (str): Steam user ID.
         app_id (int): Steam App ID.
         driver (webdriver.Chrome): Logged-in Selenium driver.
+        debug (bool): If True, save raw HTML for debugging.
 
     Returns:
         set[str]: Names of unlocked achievements (as displayed on page).
+
+    Raises:
+        ValueError: If cookies are expired or invalid.
     """
     url = f"https://steamcommunity.com/profiles/{steamid}/stats/{app_id}/achievements/"
     driver.get(url)
     time.sleep(3)
 
-    soup = BeautifulSoup(driver.page_source, "html.parser")
+    html = driver.page_source
+
+    # Debug mode: save HTML for inspection
+    if debug:
+        with open(f"debug_{steamid}.html", "w", encoding="utf-8") as f:
+            f.write(html)
+
+    soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(" ").lower()
 
     if "you do not have permission to view these game stats" in text:

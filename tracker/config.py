@@ -64,6 +64,7 @@ def load_config(default_path: str = "config.json") -> Dict[str, Any]:
     parser.add_argument("--apikey", type=str, help="Steam API key override")
     parser.add_argument("--output", type=str, help="Excel output file path")
     parser.add_argument("--config", type=str, default=default_path, help="Path to config.json")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode (save HTML pages)")
     args = parser.parse_args()
 
     cfg_path = Path(args.config)
@@ -85,6 +86,8 @@ def load_config(default_path: str = "config.json") -> Dict[str, Any]:
 
     if args.apikey:
         config["api_key"] = args.apikey
+    if args.debug:
+        config["debug"] = True
     if args.output:
         config["output_path"] = args.output
 

@@ -26,11 +26,15 @@ from .config import COOKIE_FILE
 
 
 # Ensure cookies exist before starting
-if not COOKIE_FILE.exists():
-    generate_steam_cookies(COOKIE_FILE)
+def ensure_valid_cookies() -> None:
+    """Check whether cookies exist; if missing, generate them."""
+    if not COOKIE_FILE.exists():
+        log("⚠️  No steam_cookies.pkl found — generating new cookies.")
+        generate_steam_cookies(COOKIE_FILE)
+        log("✅ Cookie file created.\n")
 
 
-def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cookie_file: Path,) -> pd.DataFrame:
+def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cookie_file: Path, debug=False) -> pd.DataFrame:
     """
     Build the main achievement tracking DataFrame.
 
@@ -46,11 +50,14 @@ def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cook
         app_id (int): Steam game AppID.
         friends (list[dict]): List of friends ({"name": str, "steamid": str}).
         cookie_file (Path): Path to saved Steam cookies.
+        debug (bool): If True, save raw HTML for debugging.
 
     Returns:
         pandas.DataFrame: Achievement tracker with friends' progress.
     """
     # Fetch schema and build DataFrame structure
+    ensure_valid_cookies()
+
     schema = fetch_schema(api_key, app_id)
     apiname_to_display = {a["apiname"]: a["displayName"] for a in schema}
 
@@ -88,7 +95,7 @@ def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cook
                 driver = create_logged_in_driver(cookie_file)
             time.sleep(HTML_SLEEP)
             try:
-                unlocked_display = fetch_player_html_selenium(fid, app_id, driver)
+                unlocked_display = fetch_player_html_selenium(fid, app_id, driver, debug=debug)
             except ValueError as e:
                 if "expired" not in str(e).lower():
                     raise
@@ -100,7 +107,7 @@ def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cook
                 generate_steam_cookies(COOKIE_FILE)
 
                 driver = create_logged_in_driver(cookie_file)
-                unlocked_display = fetch_player_html_selenium(fid, app_id, driver)
+                unlocked_display = fetch_player_html_selenium(fid, app_id, driver, debug=debug)
 
 
         # Mark unlocked achievements in DataFrame
@@ -132,6 +139,6 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
     df = build_tracker(cfg["api_key"], 
                        cfg["app_id"], 
                        cfg["friends"], 
-                       cfg["cookie_file"]
-                       )
+                       cfg["cookie_file"],
+                       cfg["debug"])
     export_styled_excel(df, cfg["friends"], cfg["output_path"])
