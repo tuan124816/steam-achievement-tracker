@@ -121,6 +121,14 @@ def fetch_player_html_selenium(steamid: str, app_id: int, driver: webdriver.Chro
     time.sleep(3)
 
     soup = BeautifulSoup(driver.page_source, "html.parser")
+    text = soup.get_text(" ").lower()
+
+    if "you do not have permission to view these game stats" in text:
+        raise ValueError("Expired Steam cookies detected")
+
+    if "this profile is private" in text or "private profile" in text:
+        return set()
+    
     unlocked = set()
 
     for row in soup.select(".achieveRow"):

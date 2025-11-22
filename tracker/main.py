@@ -87,7 +87,21 @@ def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cook
             if not driver:
                 driver = create_logged_in_driver(cookie_file)
             time.sleep(HTML_SLEEP)
-            unlocked_display = fetch_player_html_selenium(fid, app_id, driver)
+            try:
+                unlocked_display = fetch_player_html_selenium(fid, app_id, driver)
+            except ValueError as e:
+                if "expired" not in str(e).lower():
+                    raise
+
+                log("⚠️  Selenium cookie error detected.")
+                log("   → Cookie file exists but is expired or invalid.")
+                log("🔄 Regenerating cookies…")
+
+                generate_steam_cookies(COOKIE_FILE)
+
+                driver = create_logged_in_driver(cookie_file)
+                unlocked_display = fetch_player_html_selenium(fid, app_id, driver)
+
 
         # Mark unlocked achievements in DataFrame
         df[fname] = df["Achievement name"].apply(lambda s: s in unlocked_display)
