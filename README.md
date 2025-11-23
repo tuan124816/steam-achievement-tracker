@@ -66,7 +66,8 @@ Example:
   "friends": [
     { "name": "YourSteamName", "steamid": "76561198000000000" },
     { "name": "AnotherFriend", "steamid": "76561198011111111" }
-  ]
+  ],
+  "debug": false
 }
 ```
 

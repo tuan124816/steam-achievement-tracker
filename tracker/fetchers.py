@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from .constants import HEADERS, API_SLEEP, HTML_SLEEP
+from .utils import log, warn, error, debug_save_html
 from pathlib import Path
 from typing import Dict, Any, List, Set
 
@@ -128,8 +129,7 @@ def fetch_player_html_selenium(steamid: str, app_id: int, driver: webdriver.Chro
 
     # Debug mode: save HTML for inspection
     if debug:
-        with open(f"debug_{steamid}.html", "w", encoding="utf-8") as f:
-            f.write(html)
+        debug_save_html(f"{steamid}.html", html)
 
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(" ").lower()

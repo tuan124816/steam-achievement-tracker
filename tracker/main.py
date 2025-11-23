@@ -15,7 +15,7 @@ import time
 import pandas as pd
 from pathlib import Path
 from typing import Dict, Any, List
-from .utils import log, progress_bar
+from .utils import log, warn, error, progress_bar
 from .fetchers import (
     fetch_schema, fetch_player_api,
     fetch_player_html_selenium, create_logged_in_driver
@@ -90,7 +90,7 @@ def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cook
             
         except Exception:
             # Selenium fallback (for private profiles)
-            log(f"  ⚠️ API failed for {fname}, trying Selenium")
+            warn(f"  ⚠️ API failed for {fname}, trying Selenium") if debug else None
             if not driver:
                 driver = create_logged_in_driver(cookie_file)
             time.sleep(HTML_SLEEP)
@@ -100,8 +100,8 @@ def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cook
                 if "expired" not in str(e).lower():
                     raise
 
-                log("⚠️  Selenium cookie error detected.")
-                log("   → Cookie file exists but is expired or invalid.")
+                error("⚠️  Selenium cookie error detected.")
+                error("Cookie file exists but is expired or invalid.")
                 log("🔄 Regenerating cookies…")
 
                 generate_steam_cookies(COOKIE_FILE)

@@ -11,16 +11,50 @@ Provides:
 from tqdm import tqdm
 from datetime import datetime
 from typing import Iterable, Iterator, Any
+from pathlib import Path
 
 
-def log(msg: str) -> None:
+# Color codes
+class Colors:
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    RED = "\033[91m"
+    RESET = "\033[0m"
+
+
+DEBUG_DIR = Path("debug")
+
+
+def log(msg: str, color: str = Colors.GREEN) -> None:
     """
     Print a timestamped log message to the console.
 
     Args:
-        msg (str): The message to display.
+        msg (str): Text to print.
+        color (str): ANSI color code.
     """
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"{color}[{timestamp}] {msg}{Colors.RESET}")
+
+
+def warn(msg: str) -> None:
+    """Yellow warning log."""
+    log(msg, Colors.YELLOW)
+
+
+def error(msg: str) -> None:
+    """Red error log."""
+    log(msg, Colors.RED)
+
+
+def debug_save_html(filename: str, html: str) -> None:
+    """
+    Save an HTML file into /debug/ only if debug mode is enabled.
+    """
+    DEBUG_DIR.mkdir(exist_ok=True)
+    out = DEBUG_DIR / filename
+    out.write_text(html, encoding="utf-8")
+    log(f"Debug HTML saved → {out}", Colors.YELLOW)
 
 
 def progress_bar(iterable: Iterable[Any], desc: str = "Processing") -> Iterator[Any]:

@@ -40,3 +40,4 @@ notebooks/
 *.xls
 output/
 exports/
+debug/
