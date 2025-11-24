@@ -7,7 +7,7 @@ name = "steam-achievement-tracker"
 version = "1.0.0"
 description = "A tool to fetch and track Steam game achievements with API and Selenium HTML scraping."
 authors = [
-    { name="Tuấn Nguyễn Huy" }
+    { name="Tuấn Nguyễn Huy", email = "tuan124817@email.com" }
 ]
 readme = "README.md"
 license = { text = "MIT" }
@@ -18,8 +18,14 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "tqdm>=4.66.0",
     "selenium>=4.15.0",
-    "pydantic>=2.6.0"
+    "pydantic>=2.6.0",
+    "pandas",
+    "bump-my-version"
 ]
+
+[project.urls]
+Homepage = "https://github.com/your-user/steam-achievement-tracker"
+Issues = "https://github.com/your-user/steam-achievement-tracker/issues"
 
 [project.scripts]
 steam-achievement-tracker = "run_tracker:main"
@@ -29,3 +35,16 @@ packages = ["tracker"]
 
 [tool.setuptools.package-data]
 tracker = ["*.json", "*.txt"]
+
+[tool.bumpversion]
+current_version = "1.0.0"
+commit = true
+tag = true
+
+[tool.bumpversion.file."pyproject.toml"]
+search = "version = \"{current_version}\""
+replace = "version = \"{new_version}\""
+
+[tool.bumpversion.file."CHANGELOG.md"]
+search = "## {current_version}"
+replace = "## {new_version}"

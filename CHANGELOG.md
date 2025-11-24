@@ -5,18 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [1.0.0] - 2025-11-24
 ### Added
-- Full Steam achievement tracking pipeline.
-- Steam Web API integration for player summaries and achievements.
-- Selenium-based HTML scraping fallback with cookie-based authentication.
-- Auto-detection of expired cookies with HTML diagnostics saving.
-- Rich colored logging (success, warnings, errors).
-- `debug/` directory with automatic HTML dump for troubleshooting.
-- `fetchers.py` API + HTML route handling.
-- `main.py` high-level orchestrator logic.
-- `config.json` loading and CLI overrides.
-- Progress bars and timestamped logs.
-- Complete type hints and docstrings across the project.
-- Cookie setup and storage flow.
+- Full Steam API + Selenium achievement parser
+- Robust cookie management & expired-cookie detection
+- Colored logging (success/warn/error)
+- Auto HTML snapshot saving (`/debug/html_*.html`)
+- Excel export with styling
+- Configurable via JSON or CLI flags
+- Cross-platform executable support (Win/Linux/Mac)
 - Initial packaging support (`pyproject.toml`).
 
 ### Changed
