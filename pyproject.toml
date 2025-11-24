@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=66", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "steam-achievement-tracker"
+version = "1.0.0"
+description = "A tool to fetch and track Steam game achievements with API and Selenium HTML scraping."
+authors = [
+    { name="Tuấn Nguyễn Huy" }
+]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+
+dependencies = [
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "tqdm>=4.66.0",
+    "selenium>=4.15.0",
+    "pydantic>=2.6.0"
+]
+
+[project.scripts]
+steam-achievement-tracker = "run_tracker:main"
+
+[tool.setuptools]
+packages = ["tracker"]
+
+[tool.setuptools.package-data]
+tracker = ["*.json", "*.txt"]
