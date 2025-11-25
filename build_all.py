@@ -30,7 +30,7 @@ if __name__ == "__main__":
     elif system == "Linux":
         build_linux()
 
-    elif system == "Darwin": 
+    elif system == "Darwin": # selfnote: this is MacOS marker btw
         build_macos()
 
     print("\nBuild complete!\n")
