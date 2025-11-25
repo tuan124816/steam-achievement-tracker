@@ -21,6 +21,34 @@ from typing import List, Dict, Any
 from io import BytesIO
 from PIL import Image
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+
+def download_icon(icon_url):
+    """Download an icon and return raw PNG bytes or None."""
+    try:
+        resp = requests.get(icon_url, timeout=10)
+        img = Image.open(BytesIO(resp.content))
+        img.thumbnail((32, 32))
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        return icon_url, buf.getvalue()
+    except Exception:
+        return icon_url, None
+
+
+def batch_download_icons(icon_urls):
+    """Download icons concurrently for massive speed boost."""
+    icon_cache = {}
+    icon_urls = list({u for u in icon_urls if u})  # unique, not None
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        futures = [pool.submit(download_icon, url) for url in icon_urls]
+        for f in as_completed(futures):
+            url, img_bytes = f.result()
+            icon_cache[url] = img_bytes
+
+    return icon_cache
 
 
 def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_path: str) -> None:
@@ -69,9 +97,13 @@ def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_pat
         ws.set_column(i, i, 14)
     ws.freeze_panes(1, 3)       # Freeze top row + first three columns
 
-    # ====== Data rows ====== #
-    icon_cache = {}
+    # --- SPEED BOOST: download all icons in parallel ---
+    print("⏳ Downloading icons...")
+    all_icon_urls = df["Icon"].tolist()
+    icon_cache = batch_download_icons(all_icon_urls)
+    print("⚡ Icon download complete.")
 
+    # ====== Data rows ====== #
     for r, row in enumerate(df.itertuples(index=False, name=None), start=1):
         idx = (r - 1) % len(colors)
 
@@ -92,13 +124,15 @@ def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_pat
                 except Exception:
                     icon_cache[icon_url] = None
 
-            if icon_cache[icon_url]:
+            icon_bytes = icon_cache.get(icon_url)
+
+            if icon_bytes:
                 ws.insert_image(
-                    r, 0, icon_url,
+                    r, 0, "",
                     {
-                        "image_data": BytesIO(icon_cache[icon_url]),
+                        "image_data": BytesIO(icon_bytes),
                         "x_offset": 2,
-                        "y_offset": 2
+                        "y_offset": 2,
                     }
                 )
 
