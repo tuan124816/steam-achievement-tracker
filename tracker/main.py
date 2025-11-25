@@ -62,6 +62,7 @@ def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cook
     apiname_to_display = {a["apiname"]: a["displayName"] for a in schema}
 
     df = pd.DataFrame([{
+        "Icon": a["icon"],      # NEW
         "Achievement name": a["displayName"],
         "Description": a["description"],
         **{f["name"]: False for f in friends}

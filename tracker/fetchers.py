@@ -35,7 +35,9 @@ def fetch_schema(api_key: str, app_id: int) -> List[Dict[str, str]]:
             {
                 "apiname": internal API name,
                 "displayName": player-visible name,
-                "description": achievement description
+                "description": achievement description,
+                "icon": str | None,
+                "icongray": str | None
             }
     """
     url = f"https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key={api_key}&appid={app_id}"
@@ -48,7 +50,10 @@ def fetch_schema(api_key: str, app_id: int) -> List[Dict[str, str]]:
     return [
         {"apiname": a.get("name", "").strip(),
          "displayName": a.get("displayName", a.get("name", "")).strip(),
-         "description": a.get("description", "").strip()}   # NOTE: couldn't added Icon column yet
+         "description": a.get("description", "").strip(),
+         "icon": a.get("icon", None),
+         "icongray": a.get("icongray", None),
+         }   # NOTE: couldn't added Icon column yet
         for a in ach_list
     ]
 
