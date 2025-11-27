@@ -16,6 +16,7 @@ Usage:
 import sys
 from tracker.config import load_config, COOKIE_FILE
 from tracker.cookie_setup import generate_steam_cookies
+from tracker.config_validation import validate_config
 from tracker.main import run_tracker
 
 
@@ -30,10 +31,11 @@ def main():
     config = load_config()
 
     # Ensure Steam cookies are available
-    if not COOKIE_FILE.exists():
-        print("[⚙️] No Steam cookies found — launching login window...")
-        generate_steam_cookies(COOKIE_FILE)
-        print("[✅] Cookies saved successfully!\n")
+    # if not COOKIE_FILE.exists():
+    #     print("[⚙️] No Steam cookies found — launching login window...")
+    #     generate_steam_cookies(COOKIE_FILE)
+    #     print("[✅] Cookies saved successfully!\n")
+    validate_config(config)
 
     # 3. Run the tracker
     try:

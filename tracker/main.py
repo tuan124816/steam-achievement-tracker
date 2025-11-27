@@ -25,13 +25,13 @@ from .cookie_setup import generate_steam_cookies
 from .config import COOKIE_FILE
 
 
-# Ensure cookies exist before starting
-def ensure_valid_cookies() -> None:
-    """Check whether cookies exist; if missing, generate them."""
-    if not COOKIE_FILE.exists():
-        log("⚠️  No steam_cookies.pkl found — generating new cookies.")
-        generate_steam_cookies(COOKIE_FILE)
-        log("✅ Cookie file created.\n")
+# # Ensure cookies exist before starting
+# def ensure_valid_cookies() -> None:
+#     """Check whether cookies exist; if missing, generate them."""
+#     if not COOKIE_FILE.exists():
+#         log("⚠️  No steam_cookies.pkl found — generating new cookies.")
+#         generate_steam_cookies(COOKIE_FILE)
+#         log("✅ Cookie file created.\n")
 
 
 def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cookie_file: Path, debug=False) -> pd.DataFrame:
@@ -56,7 +56,6 @@ def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cook
         pandas.DataFrame: Achievement tracker with friends' progress.
     """
     # Fetch schema and build DataFrame structure
-    ensure_valid_cookies()
 
     schema = fetch_schema(api_key, app_id)
     apiname_to_display = {a["apiname"]: a["displayName"] for a in schema}

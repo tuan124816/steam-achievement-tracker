@@ -7,7 +7,7 @@ Includes:
 - Steam Web API calls for game schemas and player achievement data.
 - Selenium + BeautifulSoup scraping for locked/private profiles.
 - Automatic cookie-based login for Selenium sessions.
-- Self-test mode for verifying API/Selenium functionality.
+- Privacy detection (API-private vs Steam-private vs cookie-expired).
 """
 
 import time
@@ -16,10 +16,11 @@ import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from .constants import HEADERS, API_SLEEP, HTML_SLEEP
-from .utils import log, warn, error, debug_save_html
 from pathlib import Path
 from typing import Dict, Any, List, Set
+
+from .constants import HEADERS, API_SLEEP, HTML_SLEEP
+from .utils import log, warn, error, debug_save_html
 
 
 def fetch_schema(api_key: str, app_id: int) -> List[Dict[str, str]]:
@@ -47,13 +48,14 @@ def fetch_schema(api_key: str, app_id: int) -> List[Dict[str, str]]:
 
     # Extract the list of achievements from the schema
     ach_list = data.get("game", {}).get("availableGameStats", {}).get("achievements", [])
+
     return [
         {"apiname": a.get("name", "").strip(),
          "displayName": a.get("displayName", a.get("name", "")).strip(),
          "description": a.get("description", "").strip(),
          "icon": a.get("icon", None),
          "icongray": a.get("icongray", None),
-         }   # NOTE: couldn't added Icon column yet
+         }  
         for a in ach_list
     ]
 
@@ -122,9 +124,10 @@ def fetch_player_html_selenium(steamid: str, app_id: int, driver: webdriver.Chro
 
     Returns:
         set[str]: Names of unlocked achievements (as displayed on page).
+        empty set: fully private (LEGIT).
 
     Raises:
-        ValueError: If cookies are expired or invalid.
+        ValueError: If cookies are expired or invalid (LOGIN NEEDED).
     """
     url = f"https://steamcommunity.com/profiles/{steamid}/stats/{app_id}/achievements/"
     driver.get(url)
@@ -139,21 +142,64 @@ def fetch_player_html_selenium(steamid: str, app_id: int, driver: webdriver.Chro
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(" ").lower()
 
-    if "you do not have permission to view these game stats" in text:
-        raise ValueError("Expired Steam cookies detected")
+    # if "you do not have permission to view these game stats" in text:
+    #     raise ValueError("Expired Steam cookies detected")
 
-    if "this profile is private" in text or "private profile" in text:
-        return set()
+    # if "this profile is private" in text or "private profile" in text:
+    #     return set()
     
-    unlocked = set()
+    # unlocked = set()
 
+    # for row in soup.select(".achieveRow"):
+    #     title = row.select_one("h3.ellipsis")
+    #     unlock = row.select_one(".achieveUnlockTime")
+
+    #     # If the element contains an unlock time, then achievement is earned
+    #     if title and unlock and "Unlocked" in unlock.get_text():
+    #         unlocked.add(title.get_text(strip=True))
+    # return unlocked
+
+
+    # # Case 1 — Fully private profile = LEGIT private
+    # if "this profile is private" in text:
+    #     return set()
+
+    # # Case 2 — Cookie expired OR fully-private returns denial
+    # if "you do not have permission to view these game stats" in text:
+    #     # Check if we *can* view the profile itself
+    #     profile_private = (
+    #         soup.select_one(".profile_private_info") or
+    #         "this profile is private" in text
+    #     )
+
+    #     if profile_private:
+    #         # Fully private → LEGIT privacy
+    #         return set()
+
+    #     # Otherwise: expired cookie → REQUIRES RELOGIN
+    #     raise ValueError("Expired Steam cookies detected")
+
+    logged = {c["name"]: c["value"] for c in driver.get_cookies()}
+
+    if "you do not have permission to view these game stats" in text:
+        if not logged:
+            ValueError("Expired Steam cookies detected")
+        else:
+            warn("This profile is private. Skipping ...")
+            return set()
+
+    if "this profile is private" in text:
+        warn("This profile is private. Skipping ...")
+        return set()
+
+    # Case 3 — Normal achievement parsing
+    unlocked = set()
     for row in soup.select(".achieveRow"):
         title = row.select_one("h3.ellipsis")
         unlock = row.select_one(".achieveUnlockTime")
-
-        # If the element contains an unlock time, then achievement is earned
-        if title and unlock and "Unlocked" in unlock.get_text():
+        if title and unlock and "unlocked" in unlock.get_text().lower():
             unlocked.add(title.get_text(strip=True))
+
     return unlocked
 
 
@@ -178,9 +224,10 @@ if __name__ == "__main__":
     print(f"✅ Schema loaded: {len(schema)} achievements")
 
     steamid = input("Enter a SteamID to test: ")
-    print("Fetching public API achievements...")
+    
+    print("\nFetching API data...")
     data = fetch_player_api(cfg["api_key"], cfg["app_id"], steamid)
-    print(f"→ Got {len(data)} entries")
+    print(f"→ API returned: {len(data)} entries")
 
     # --- Optional Selenium test with interactive cookie setup ---
     cookie_path = Path("steam_cookies.pkl")
