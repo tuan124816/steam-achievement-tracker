@@ -13,7 +13,7 @@ def validate_config(cfg):
         raise SystemExit
 
     cookie = Path(cfg.get("cookie_file", "steam_cookies.pkl"))
-    print('hehehe: ', Path(cfg.get("cookie_file", "steam_cookies.pkl")))
+    # print('hehehe: ', Path(cfg.get("cookie_file", "steam_cookies.pkl")))
     if not cookie.exists():
         print('helelee 222: ')
         error(f"Cookie file missing: {cookie}")

@@ -135,6 +135,16 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
             - output_path
     """
     from .excel_utils import export_styled_excel
+    from .steam_utils import resolve_vanity_url
+
+    for friend in cfg["friends"]:
+        raw = friend["steamid"]
+        steamid = resolve_vanity_url(raw, api_key=cfg["api_key"])
+
+        if steamid:
+            friend["steamid"] = steamid
+        else:
+            warn(f"⚠️ Could not resolve vanity URL '{raw}'.  Skipping ...")
 
     df = build_tracker(cfg["api_key"], 
                        cfg["app_id"], 
