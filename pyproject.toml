@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "steam-achievement-tracker"
-version = "1.0.0"
+version = ["version"]
 description = "A tool to fetch and track Steam game achievements with API and Selenium HTML scraping."
 authors = [
     { name="Tuấn Nguyễn Huy", email = "tuan124817@email.com" }
