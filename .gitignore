@@ -38,6 +38,7 @@ notebooks/
 # --- Build / Output Files ---
 *.xlsx
 *.xls
+.cache/
 output/
 exports/
 debug/

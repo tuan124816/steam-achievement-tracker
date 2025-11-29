@@ -22,6 +22,42 @@ from io import BytesIO
 from PIL import Image
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+import hashlib
+
+
+# ===== NEW: Icon cache directory =====
+ICON_CACHE_DIR = Path(".cache/icons")
+ICON_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# ===== NEW: Cache helpers =====
+def _cache_filename(url: str) -> Path:
+    """Hash the URL → deterministic PNG path."""
+    h = hashlib.sha1(url.encode()).hexdigest()
+    return ICON_CACHE_DIR / f"{h}.png"
+
+
+def _load_icon_from_disk(url: str):
+    """Return icon bytes if cached, else None."""
+    f = _cache_filename(url)
+    if f.exists():
+        try:
+            print(f"📁 Cache hit: {f.name}")
+            return f.read_bytes()
+        except:
+            return None
+    return None
+
+
+def _save_icon_to_disk(url: str, img_bytes: bytes):
+    """Write PNG icon bytes to disk."""
+    try:
+        path =  _cache_filename(url)
+        path.write_bytes(img_bytes)
+        print(f"💾Saved to cache: {path.name}")
+    except:
+        pass
 
 
 def download_icon(icon_url):
@@ -32,24 +68,36 @@ def download_icon(icon_url):
         img.thumbnail((32, 32))
         buf = BytesIO()
         img.save(buf, format="PNG")
-        return icon_url, buf.getvalue()
+        return buf.getvalue()
     except Exception:
         return icon_url, None
 
 
 def batch_download_icons(icon_urls):
-    """Download icons concurrently for massive speed boost."""
+    """Download icons concurrently for massive speed boost. Now with disk caching."""
     icon_cache = {}
-    icon_urls = list({u for u in icon_urls if u})  # unique, not None
+    urls = list({u for u in icon_urls if u})  # unique, not None
 
-    with ThreadPoolExecutor(max_workers=16) as pool:
-        futures = [pool.submit(download_icon, url) for url in icon_urls]
-        for f in as_completed(futures):
-            url, img_bytes = f.result()
-            icon_cache[url] = img_bytes
+    # Check disk cache first 
+    to_download = []
+    for url in urls:
+        cached = _load_icon_from_disk(url)
+        if cached:
+            icon_cache[url] = cached
+        else:
+            to_download.append(url)
+
+    if to_download:
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            futures = {pool.submit(download_icon, u): u for u in to_download}
+            for fut in as_completed(futures):
+                url = futures[fut]
+                img_bytes = fut.result()
+                icon_cache[url] = img_bytes
+                if img_bytes:
+                    _save_icon_to_disk(url, img_bytes)
 
     return icon_cache
-
 
 def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_path: str) -> None:
     """
@@ -151,63 +199,6 @@ def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_pat
 
     wb.close()
     print(f"✅ Saved Excel to {out_path}")
-
-
-# ====== (Planned Feature) Icon Column ====== #
-# The following section is commented out but illustrates how to insert
-# achievement icons directly in Excel beside their names. Uncomment and
-# adapt once the main tracker integrates icon URLs in the schema DataFrame.
-
-"""
-    # # 🖼️ Add new column for icons
-    # cols = ["Icon", "Achievement name", "Description"] + [f["name"] for f in friends]
-    # for i, name in enumerate(cols):
-    #     ws.write(0, i, name, header_fmt)
-
-    # ws.set_column(0, 0, 8)    # Icon column (small)
-    # ws.set_column(1, 1, 40)   # Achievement name
-    # ws.set_column(2, 2, 80)   # Description
-    # for i in range(3, len(cols)):
-    #     ws.set_column(i, i, 14)
-    # ws.freeze_panes(1, 3)
-
-    # # 🎨 Cache downloaded icons
-    # icon_cache = {}
-
-    # for r, row in enumerate(df.itertuples(index=False, name=None), start=1):
-    #     idx = (r - 1) % len(colors)
-    #     icon_url = getattr(row, "Icon", None)
-    #     ach_name, desc = row[0], row[1]
-
-    #     # Download & cache icons
-    #     if icon_url:
-    #         if icon_url not in icon_cache:
-    #             try:
-    #                 resp = requests.get(icon_url, timeout=10)
-    #                 img = Image.open(BytesIO(resp.content))
-    #                 img.thumbnail((32, 32))
-    #                 buf = BytesIO()
-    #                 img.save(buf, format="PNG")
-    #                 icon_cache[icon_url] = buf.getvalue()
-    #             except Exception:
-    #                 icon_cache[icon_url] = None
-
-    #         if icon_cache[icon_url]:
-    #             ws.insert_image(r, 0, icon_url, {
-    #                 "image_data": BytesIO(icon_cache[icon_url]),
-    #                 "x_offset": 3, "y_offset": 3
-    #             })
-
-    #     ws.write(r, 1, ach_name, row_fmt[idx])
-    #     ws.write(r, 2, desc, text_fmt[idx])
-
-    #     for j, f in enumerate(friends):
-    #         ws.write(r, 3 + j, "✔" if bool(row[2 + j]) else "", row_fmt[idx])
-
-    #     desc_len = len(desc or "")
-    #     lines = max(1, math.ceil(desc_len / 100))
-    #     ws.set_row(r, 30 + lines * 15)
-"""
 
 
 if __name__ == "__main__":
