@@ -46,7 +46,7 @@ def fetch_schema(api_key: str, app_id: int) -> List[Dict[str, str]]:
     # Try cache first to avoid repeated API calls.
     cached = load_schema_from_cache(app_id)
     if cached:
-        log(f"📁 Loaded schema cache ({len(cached)} achievements)")
+        log(f"📁 Loaded schema cache ({len(cached)} achievements hehe1)")
         return cached
     
     # API fallback

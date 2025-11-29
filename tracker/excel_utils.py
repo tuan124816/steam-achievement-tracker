@@ -31,33 +31,28 @@ ICON_CACHE_DIR = Path(".cache/icons")
 ICON_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# ===== NEW: Cache helpers =====
-def _cache_filename(url: str) -> Path:
-    """Hash the URL → deterministic PNG path."""
-    h = hashlib.sha1(url.encode()).hexdigest()
-    return ICON_CACHE_DIR / f"{h}.png"
+def _icon_dir(app_id: int) -> Path:
+    d = Path("steam_cache/icons") / str(app_id)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+def _icon_filename(app_id: int, url: str) -> Path:
+    h = hashlib.md5(url.encode("utf-8")).hexdigest()
+    return _icon_dir(app_id) / f"{h}.png"
 
 
-def _load_icon_from_disk(url: str):
-    """Return icon bytes if cached, else None."""
-    f = _cache_filename(url)
-    if f.exists():
-        try:
-            print(f"📁 Cache hit: {f.name}")
-            return f.read_bytes()
-        except:
-            return None
+def _load_icon_from_disk(app_id: int, url: str):
+    path = _icon_filename(app_id, url)
+    if path.exists():
+        #print(f"📁 Cache hit: [{app_id}] {path.name}")
+        return path.read_bytes()
     return None
 
 
-def _save_icon_to_disk(url: str, img_bytes: bytes):
-    """Write PNG icon bytes to disk."""
-    try:
-        path =  _cache_filename(url)
-        path.write_bytes(img_bytes)
-        print(f"💾Saved to cache: {path.name}")
-    except:
-        pass
+def _save_icon_to_disk(app_id: int, url: str, img_bytes: bytes):
+    path = _icon_filename(app_id, url)
+    path.write_bytes(img_bytes)
+    #print(f"💾 Saved to cache: [{app_id}] {path.name}")
 
 
 def download_icon(icon_url):
@@ -73,20 +68,21 @@ def download_icon(icon_url):
         return icon_url, None
 
 
-def batch_download_icons(icon_urls):
+def batch_download_icons(icon_urls, app_id: int):
     """Download icons concurrently for massive speed boost. Now with disk caching."""
     icon_cache = {}
     urls = list({u for u in icon_urls if u})  # unique, not None
+    to_download = []
 
     # Check disk cache first 
-    to_download = []
     for url in urls:
-        cached = _load_icon_from_disk(url)
+        cached = _load_icon_from_disk(app_id, url)
         if cached:
             icon_cache[url] = cached
         else:
             to_download.append(url)
 
+    # Download what we don't have
     if to_download:
         with ThreadPoolExecutor(max_workers=16) as pool:
             futures = {pool.submit(download_icon, u): u for u in to_download}
@@ -94,12 +90,14 @@ def batch_download_icons(icon_urls):
                 url = futures[fut]
                 img_bytes = fut.result()
                 icon_cache[url] = img_bytes
-                if img_bytes:
-                    _save_icon_to_disk(url, img_bytes)
+                #print(f"🌐 Downloaded: {url.split('/')[-1]}")
 
+                if img_bytes:
+                    _save_icon_to_disk(app_id, url, img_bytes)
+        print("⚡ Icon download complete.")
     return icon_cache
 
-def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_path: str) -> None:
+def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_path: str, app_id: int) -> None:
     """
     Export a styled Excel workbook containing all achievements and friends' progress.
 
@@ -148,8 +146,7 @@ def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_pat
     # --- SPEED BOOST: download all icons in parallel ---
     print("⏳ Downloading icons...")
     all_icon_urls = df["Icon"].tolist()
-    icon_cache = batch_download_icons(all_icon_urls)
-    print("⚡ Icon download complete.")
+    icon_cache = batch_download_icons(all_icon_urls, app_id)
 
     # ====== Data rows ====== #
     for r, row in enumerate(df.itertuples(index=False, name=None), start=1):
@@ -210,4 +207,4 @@ if __name__ == "__main__":
         "TestUser": [True, False],
         "Another": [False, True],
     })
-    export_styled_excel(df, friends, "test_output.xlsx")
+    export_styled_excel(df, friends, "test_output.xlsx", app_id=1)
