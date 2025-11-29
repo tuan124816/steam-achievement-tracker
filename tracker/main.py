@@ -151,4 +151,4 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
                        cfg["friends"], 
                        cfg["cookie_file"],
                        cfg["debug"])
-    export_styled_excel(df, cfg["friends"], cfg["output_path"])
+    export_styled_excel(df, cfg["friends"], cfg["output_path"], cfg["app_id"])

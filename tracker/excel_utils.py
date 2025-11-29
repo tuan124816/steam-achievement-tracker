@@ -22,6 +22,37 @@ from io import BytesIO
 from PIL import Image
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+import hashlib
+
+
+# ===== NEW: Icon cache directory =====
+ICON_CACHE_DIR = Path(".cache/icons")
+ICON_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _icon_dir(app_id: int) -> Path:
+    d = Path("steam_cache/icons") / str(app_id)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+def _icon_filename(app_id: int, url: str) -> Path:
+    h = hashlib.md5(url.encode("utf-8")).hexdigest()
+    return _icon_dir(app_id) / f"{h}.png"
+
+
+def _load_icon_from_disk(app_id: int, url: str):
+    path = _icon_filename(app_id, url)
+    if path.exists():
+        #print(f"📁 Cache hit: [{app_id}] {path.name}")
+        return path.read_bytes()
+    return None
+
+
+def _save_icon_to_disk(app_id: int, url: str, img_bytes: bytes):
+    path = _icon_filename(app_id, url)
+    path.write_bytes(img_bytes)
+    #print(f"💾 Saved to cache: [{app_id}] {path.name}")
 
 
 def download_icon(icon_url):
@@ -32,26 +63,41 @@ def download_icon(icon_url):
         img.thumbnail((32, 32))
         buf = BytesIO()
         img.save(buf, format="PNG")
-        return icon_url, buf.getvalue()
+        return buf.getvalue()
     except Exception:
         return icon_url, None
 
 
-def batch_download_icons(icon_urls):
-    """Download icons concurrently for massive speed boost."""
+def batch_download_icons(icon_urls, app_id: int):
+    """Download icons concurrently for massive speed boost. Now with disk caching."""
     icon_cache = {}
-    icon_urls = list({u for u in icon_urls if u})  # unique, not None
+    urls = list({u for u in icon_urls if u})  # unique, not None
+    to_download = []
 
-    with ThreadPoolExecutor(max_workers=16) as pool:
-        futures = [pool.submit(download_icon, url) for url in icon_urls]
-        for f in as_completed(futures):
-            url, img_bytes = f.result()
-            icon_cache[url] = img_bytes
+    # Check disk cache first 
+    for url in urls:
+        cached = _load_icon_from_disk(app_id, url)
+        if cached:
+            icon_cache[url] = cached
+        else:
+            to_download.append(url)
 
+    # Download what we don't have
+    if to_download:
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            futures = {pool.submit(download_icon, u): u for u in to_download}
+            for fut in as_completed(futures):
+                url = futures[fut]
+                img_bytes = fut.result()
+                icon_cache[url] = img_bytes
+                #print(f"🌐 Downloaded: {url.split('/')[-1]}")
+
+                if img_bytes:
+                    _save_icon_to_disk(app_id, url, img_bytes)
+        print("⚡ Icon download complete.")
     return icon_cache
 
-
-def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_path: str) -> None:
+def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_path: str, app_id: int) -> None:
     """
     Export a styled Excel workbook containing all achievements and friends' progress.
 
@@ -100,8 +146,7 @@ def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_pat
     # --- SPEED BOOST: download all icons in parallel ---
     print("⏳ Downloading icons...")
     all_icon_urls = df["Icon"].tolist()
-    icon_cache = batch_download_icons(all_icon_urls)
-    print("⚡ Icon download complete.")
+    icon_cache = batch_download_icons(all_icon_urls, app_id)
 
     # ====== Data rows ====== #
     for r, row in enumerate(df.itertuples(index=False, name=None), start=1):
@@ -153,63 +198,6 @@ def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_pat
     print(f"✅ Saved Excel to {out_path}")
 
 
-# ====== (Planned Feature) Icon Column ====== #
-# The following section is commented out but illustrates how to insert
-# achievement icons directly in Excel beside their names. Uncomment and
-# adapt once the main tracker integrates icon URLs in the schema DataFrame.
-
-"""
-    # # 🖼️ Add new column for icons
-    # cols = ["Icon", "Achievement name", "Description"] + [f["name"] for f in friends]
-    # for i, name in enumerate(cols):
-    #     ws.write(0, i, name, header_fmt)
-
-    # ws.set_column(0, 0, 8)    # Icon column (small)
-    # ws.set_column(1, 1, 40)   # Achievement name
-    # ws.set_column(2, 2, 80)   # Description
-    # for i in range(3, len(cols)):
-    #     ws.set_column(i, i, 14)
-    # ws.freeze_panes(1, 3)
-
-    # # 🎨 Cache downloaded icons
-    # icon_cache = {}
-
-    # for r, row in enumerate(df.itertuples(index=False, name=None), start=1):
-    #     idx = (r - 1) % len(colors)
-    #     icon_url = getattr(row, "Icon", None)
-    #     ach_name, desc = row[0], row[1]
-
-    #     # Download & cache icons
-    #     if icon_url:
-    #         if icon_url not in icon_cache:
-    #             try:
-    #                 resp = requests.get(icon_url, timeout=10)
-    #                 img = Image.open(BytesIO(resp.content))
-    #                 img.thumbnail((32, 32))
-    #                 buf = BytesIO()
-    #                 img.save(buf, format="PNG")
-    #                 icon_cache[icon_url] = buf.getvalue()
-    #             except Exception:
-    #                 icon_cache[icon_url] = None
-
-    #         if icon_cache[icon_url]:
-    #             ws.insert_image(r, 0, icon_url, {
-    #                 "image_data": BytesIO(icon_cache[icon_url]),
-    #                 "x_offset": 3, "y_offset": 3
-    #             })
-
-    #     ws.write(r, 1, ach_name, row_fmt[idx])
-    #     ws.write(r, 2, desc, text_fmt[idx])
-
-    #     for j, f in enumerate(friends):
-    #         ws.write(r, 3 + j, "✔" if bool(row[2 + j]) else "", row_fmt[idx])
-
-    #     desc_len = len(desc or "")
-    #     lines = max(1, math.ceil(desc_len / 100))
-    #     ws.set_row(r, 30 + lines * 15)
-"""
-
-
 if __name__ == "__main__":
     import pandas as pd
     friends = [{"name": "TestUser"}, {"name": "Another"}]
@@ -219,4 +207,4 @@ if __name__ == "__main__":
         "TestUser": [True, False],
         "Another": [False, True],
     })
-    export_styled_excel(df, friends, "test_output.xlsx")
+    export_styled_excel(df, friends, "test_output.xlsx", app_id=1)

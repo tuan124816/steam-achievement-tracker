@@ -21,6 +21,7 @@ from typing import Dict, Any, List, Set
 
 from .constants import HEADERS, API_SLEEP, HTML_SLEEP
 from .utils import log, warn, error, debug_save_html
+from .steam_cache import load_schema_from_cache, save_schema_to_cache, download_icon
 
 
 def fetch_schema(api_key: str, app_id: int) -> List[Dict[str, str]]:
@@ -41,6 +42,15 @@ def fetch_schema(api_key: str, app_id: int) -> List[Dict[str, str]]:
                 "icongray": str | None
             }
     """
+
+    # Try cache first to avoid repeated API calls.
+    cached = load_schema_from_cache(app_id)
+    if cached:
+        log(f"📁 Loaded schema cache ({len(cached)} achievements hehe1)")
+        return cached
+    
+    # API fallback
+    log("🌐 Downloading schema from Steam API…")
     url = f"https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key={api_key}&appid={app_id}"
     r = requests.get(url, headers=HEADERS, timeout=20)
     r.raise_for_status()
@@ -48,8 +58,7 @@ def fetch_schema(api_key: str, app_id: int) -> List[Dict[str, str]]:
 
     # Extract the list of achievements from the schema
     ach_list = data.get("game", {}).get("availableGameStats", {}).get("achievements", [])
-
-    return [
+    schema = [
         {"apiname": a.get("name", "").strip(),
          "displayName": a.get("displayName", a.get("name", "")).strip(),
          "description": a.get("description", "").strip(),
@@ -58,6 +67,12 @@ def fetch_schema(api_key: str, app_id: int) -> List[Dict[str, str]]:
          }  
         for a in ach_list
     ]
+
+    # Save cache
+    save_schema_to_cache(app_id, schema)
+    log("💾 Schema cached.")
+
+    return schema
 
 
 def fetch_player_api(api_key: str, app_id: int, steamid: str) -> Dict[str, int]:

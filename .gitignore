@@ -38,6 +38,10 @@ notebooks/
 # --- Build / Output Files ---
 *.xlsx
 *.xls
+.cache/
 output/
 exports/
 debug/
+steam_cache/
+dist/
+build/
