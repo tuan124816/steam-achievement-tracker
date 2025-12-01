@@ -27,7 +27,7 @@ import hashlib
 
 
 # ===== NEW: Icon cache directory =====
-ICON_CACHE_DIR = Path(".cache/icons")
+ICON_CACHE_DIR = Path("steam_cache/icons")
 ICON_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -78,12 +78,14 @@ def batch_download_icons(icon_urls, app_id: int):
     for url in urls:
         cached = _load_icon_from_disk(app_id, url)
         if cached:
+            #print('cached from local')
             icon_cache[url] = cached
         else:
             to_download.append(url)
 
     # Download what we don't have
     if to_download:
+        print("⏳ Downloading icons...")
         with ThreadPoolExecutor(max_workers=16) as pool:
             futures = {pool.submit(download_icon, u): u for u in to_download}
             for fut in as_completed(futures):
@@ -144,7 +146,7 @@ def export_styled_excel(df: pd.DataFrame, friends: List[Dict[str, Any]], out_pat
     ws.freeze_panes(1, 3)       # Freeze top row + first three columns
 
     # --- SPEED BOOST: download all icons in parallel ---
-    print("⏳ Downloading icons...")
+    
     all_icon_urls = df["Icon"].tolist()
     icon_cache = batch_download_icons(all_icon_urls, app_id)
 

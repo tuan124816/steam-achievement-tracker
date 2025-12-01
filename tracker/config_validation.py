@@ -21,13 +21,13 @@ def validate_config(cfg):
         log("✅ Cookie file created.\n")
         # raise SystemExit
 
-    # AppID test
-    try:
-        schema = fetch_schema(cfg["api_key"], cfg["app_id"])
-        if not schema:
-            raise RuntimeError
-    except Exception:
-        error("Invalid AppID or API key — Schema fetch failed.")
-        raise SystemExit
+    # # AppID test
+    # try:
+    #     schema = fetch_schema(cfg["api_key"], cfg["app_id"])
+    #     if not schema:
+    #         raise RuntimeError
+    # except Exception:
+    #     error("Invalid AppID or API key — Schema fetch failed.")
+    #     raise SystemExit
 
     return True
