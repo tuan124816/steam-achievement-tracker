@@ -56,7 +56,6 @@ def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cook
         pandas.DataFrame: Achievement tracker with friends' progress.
     """
     # Fetch schema and build DataFrame structure
-
     schema = fetch_schema(api_key, app_id)
     apiname_to_display = {a["apiname"]: a["displayName"] for a in schema}
 

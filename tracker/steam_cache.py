@@ -14,9 +14,15 @@ from pathlib import Path
 from typing import Dict, Any, List
 from .utils import log, warn, error
 
-CACHE_DIR = Path(".cache")
+ROOT_DIR = Path(__file__).resolve().parents[1]
+
+CACHE_DIR = ROOT_DIR / "steam_cache"
+SCHEMA_DIR = CACHE_DIR / "schema"
 ICON_DIR = CACHE_DIR / "icons"
+
+# Create directories safely
 CACHE_DIR.mkdir(exist_ok=True)
+SCHEMA_DIR.mkdir(exist_ok=True)
 ICON_DIR.mkdir(exist_ok=True)
 
 
@@ -25,7 +31,7 @@ ICON_DIR.mkdir(exist_ok=True)
 # -----------------------------------------------------
 
 def get_schema_cache_path(app_id: int) -> Path:
-    return CACHE_DIR / f"schema_{app_id}.json"
+    return SCHEMA_DIR / f"schema_{app_id}.json"
 
 
 def load_schema_from_cache(app_id: int) -> List[Dict[str, Any]] | None:
@@ -40,6 +46,7 @@ def load_schema_from_cache(app_id: int) -> List[Dict[str, Any]] | None:
 
 def save_schema_to_cache(app_id: int, schema: List[Dict[str, Any]]) -> None:
     path = get_schema_cache_path(app_id)
+    print('path: ', path)
     path.write_text(json.dumps(schema, indent=2), encoding="utf-8")
 
 
