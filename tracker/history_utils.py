@@ -63,7 +63,7 @@ def _make_snapshot(app_id: int, df: pd.DataFrame, friends: List[Dict[str, Any]])
     return snapshot
 
 
-def save_history(app_id: int, df: pd.DataFrame, friends: List[Dict[str, Any]], history_dir: Optional[Path] = None) -> Path:
+def save_history(app_id: int, snapshot: dict, history_dir: Optional[Path] = None) -> Path:
     """
     Save a timestamped JSON snapshot and update latest.json.
 
@@ -71,22 +71,39 @@ def save_history(app_id: int, df: pd.DataFrame, friends: List[Dict[str, Any]], h
         Path to the written timestamped snapshot.
     """
     app_dir = _ensure_app_dir(app_id, history_dir)
-    snapshot = _make_snapshot(app_id, df, friends)
+    # snapshot = _make_snapshot(app_id, df, friends)
 
-    ts = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    filename = f"{ts}.json"
-    target = app_dir / filename
+    # ts = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    # filename = f"{ts}.json"
+    # target = app_dir / filename
+    # latest = app_dir / "latest.json"
+
+    # try:
+    #     target.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False), encoding="utf-8")
+    #     latest.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False), encoding="utf-8")
+    #     log(f"Saved history: {target}")
+    # except Exception as e:
+    #     log(f"Error saving history: {e}")
+    #     raise
+
+    # return target
+    """Save a snapshot into history/<app_id>/<timestamp>.json"""
+
+    # app_dir = HISTORY_DIR / str(app_id)
+    # app_dir.mkdir(parents=True, exist_ok=True)
+
+    ts = snapshot["timestamp"]
+    path = app_dir / f"{ts}.json"
     latest = app_dir / "latest.json"
+    print(f'{ts} \n {path}')
 
-    try:
-        target.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False), encoding="utf-8")
-        latest.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False), encoding="utf-8")
-        log(f"Saved history: {target}")
-    except Exception as e:
-        log(f"Error saving history: {e}")
-        raise
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(snapshot, f, indent=2, ensure_ascii=False)
+    
+    with open(latest, "w", encoding="utf-8") as f:
+        json.dump(snapshot, f, indent=2, ensure_ascii=False)
 
-    return target
+    print(f"📁 Saved snapshot: {path}")
 
 
 def load_latest_history(app_id: int, history_dir: Optional[Path] = None) -> Optional[Dict[str, Any]]:
@@ -118,3 +135,117 @@ def load_history(app_id: int, history_dir: Optional[Path] = None) -> List[Dict[s
             log(f"Skipping corrupted history file: {p}")
             continue
     return snapshots
+
+
+def compare_snapshots(prev: dict, curr: dict) -> dict:
+    """
+    Compare two snapshots of friend achievement progress.
+
+    Returns a diff dict:
+    {
+        "friendname": {
+            "new_count": int,
+            "new_achievements": [api_name, ...]
+        },
+        ...
+    }
+    """
+    if prev is None:
+        # No previous history → everything is "new" compared to nothing
+        diff = {}
+        for friend, curr_list in curr["friends"].items():
+            diff[friend] = {
+                "new_count": len(curr_list),
+                "new_achievements": curr_list
+            }
+        return diff
+
+    diff = {}
+
+    for friend, curr_data in curr["friends"].items():
+        curr_list = curr_data.get("achievements", [])
+        curr_set = set(curr_list)
+
+        if friend not in prev["friends"]:
+            # Friend did not exist before — treat everything as new
+            diff[friend] = {
+                "new_count": len(curr_list),
+                "new_achievements": curr_list
+            }
+            continue
+
+        prev_list = prev["friends"][friend].get("achievements", [])
+        prev_set = set(prev_list)
+
+        gained = sorted(curr_set - prev_set)
+
+        diff[friend] = {
+            "new_count": len(gained),
+            "new_achievements": gained
+        }
+            
+
+    return diff
+
+
+def build_diff_text(diff: dict) -> str:
+    lines = []
+    lines.append("Steam Achievement Tracker — Progress Changes")
+    lines.append("---------------------------------------------------")
+
+    for friend, d in diff.items():
+        if d["new_count"] == 0:
+            lines.append(f"{friend}: no new achievements.")
+        else:
+            lines.append(f"{friend}: +{d['new_count']} new achievement(s):")
+            for a in d["new_achievements"]:
+                lines.append(f"   • {a}")
+
+    return "\n".join(lines)
+
+
+def save_diff_text(app_id: int, diff_text: str):
+    out = HISTORY_ROOT / str(app_id)
+    out.mkdir(parents=True, exist_ok=True)
+
+    fname = out / f"diff_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
+    fname.write_text(diff_text, encoding="utf-8")
+    return fname
+
+
+def build_snapshot(app_id: int, df: pd.DataFrame, friends: list, run_timestamp: str) -> dict:
+    """
+    Convert the achievement DataFrame into a snapshot structure suitable for saving.
+
+    Snapshot format:
+    {
+        "app_id": 12345,
+        "timestamp": "...",
+        "total_achievements": 52,
+        "friends": {
+            "Alice": {
+                "unlocked": 30,
+                "achievements": ["ACH_A", "ACH_B", ...]
+            },
+            "Bob": { ... }
+        }
+    }
+    """
+    snapshot = {
+        "app_id": app_id,
+        "timestamp": run_timestamp,
+        "total_achievements": len(df),
+        "friends": {}
+    }
+
+    # For each friend
+    for friend in friends:
+        name = friend["name"]
+        unlocked_list = df[df[name] == True]["Achievement name"].tolist()
+
+        snapshot["friends"][name] = {
+            "unlocked": len(unlocked_list),
+            "achievements": unlocked_list
+        }
+
+    return snapshot
