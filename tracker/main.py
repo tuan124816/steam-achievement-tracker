@@ -135,6 +135,7 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
     """
     from .excel_utils import export_styled_excel
     from .steam_utils import resolve_vanity_url
+    from .history_utils import save_history
 
     for friend in cfg["friends"]:
         raw = friend["steamid"]
@@ -151,3 +152,9 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
                        cfg["cookie_file"],
                        cfg["debug"])
     export_styled_excel(df, cfg["friends"], cfg["output_path"], cfg["app_id"])
+
+    # Save history snapshot 
+    try:
+        save_history(cfg["app_id"], df, cfg["friends"])
+    except Exception as e:
+        log(f"⚠️ Failed to save history: {e}")
