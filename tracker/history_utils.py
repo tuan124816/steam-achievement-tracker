@@ -18,6 +18,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import matplotlib.pyplot as plt
 
 import pandas as pd
 
@@ -249,3 +250,49 @@ def build_snapshot(app_id: int, df: pd.DataFrame, friends: list, run_timestamp: 
         }
 
     return snapshot
+
+
+def plot_progress(app_id: int, history_dir: Path | None = None) -> None:
+    """
+    Generate progress graphs for each friend based on history snapshots.
+    Saves PNG graphs into history/<app_id>/graphs/
+    """
+    app_dir = _ensure_app_dir(app_id, history_dir)
+    graph_dir = app_dir / "graphs"
+    graph_dir.mkdir(parents=True, exist_ok=True)
+
+    snapshots = load_history(app_id, history_dir)
+
+    if not snapshots:
+        print("📭 No history found — nothing to plot.")
+        return
+
+    # Collect timeline of achievement counts per friend
+    timeline = {}  # { friend_name: [(timestamp, count), ...] }
+
+    for snap in snapshots:
+        ts = snap["timestamp"]
+        for friend, data in snap["friends"].items():
+            unlocked = data.get("unlocked", 0)
+            timeline.setdefault(friend, []).append((ts, unlocked))
+
+    # Plot each friend's graph
+    for friend, entries in timeline.items():
+        # Sort by timestamp
+        entries = sorted(entries, key=lambda x: x[0])
+        x = [ts for ts, _ in entries]
+        y = [count for _, count in entries]
+
+        plt.figure(figsize=(8,4))
+        plt.plot(x, y, marker="o")
+        plt.xticks(rotation=45, ha="right")
+        plt.title(f"{friend} — Achievement Progress")
+        plt.xlabel("Time")
+        plt.ylabel("Unlocked achievements")
+        plt.tight_layout()
+
+        out = graph_dir / f"{friend}.png"
+        plt.savefig(out)
+        plt.close()
+
+        print(f"📈 Saved graph: {out}")

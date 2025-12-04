@@ -136,6 +136,7 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
     from .excel_utils import export_styled_excel
     from .steam_utils import resolve_vanity_url
     from .history_utils import build_snapshot, save_history, load_latest_history, compare_snapshots, build_diff_text, save_diff_text
+    from .history_utils import plot_progress
 
     for friend in cfg["friends"]:
         raw = friend["steamid"]
@@ -164,12 +165,12 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
     snapshot = build_snapshot(cfg["app_id"], df, cfg["friends"], timestamp)
     prev = load_latest_history(cfg["app_id"])
 
-    import json
-    with open('test1.json', "w", encoding="utf-8") as f:
-        json.dump(snapshot, f, indent=2, ensure_ascii=False)
+    # import json
+    # with open('test1.json', "w", encoding="utf-8") as f:
+    #     json.dump(snapshot, f, indent=2, ensure_ascii=False)
     
-    with open('test2.json', "w", encoding="utf-8") as f:
-        json.dump(prev, f, indent=2, ensure_ascii=False)
+    # with open('test2.json', "w", encoding="utf-8") as f:
+    #     json.dump(prev, f, indent=2, ensure_ascii=False)
     save_history(cfg["app_id"], snapshot)
 
     # === Compare ===
@@ -182,3 +183,6 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
     # Optional: save diff file
     diff_file = save_diff_text(cfg["app_id"], diff_text)
     log(f"📝 Diff saved to {diff_file}")
+
+    # Generate graphs after run
+    plot_progress(cfg["app_id"])
