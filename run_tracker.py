@@ -38,11 +38,12 @@ def main():
     validate_config(config)
 
     # 3. Run the tracker
-    try:
-        run_tracker(config)
-    except Exception as e:
-        print(f"[❌] Tracker failed: {e}")
-        sys.exit(1)
+    run_tracker(config)
+    # try:
+    #     run_tracker(config)
+    # except Exception as e:
+    #     print(f"[❌] Tracker failed: {e}")
+    #     sys.exit(1)
 
 
 if __name__ == "__main__":

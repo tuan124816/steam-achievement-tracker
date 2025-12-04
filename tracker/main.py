@@ -135,6 +135,7 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
     """
     from .excel_utils import export_styled_excel
     from .steam_utils import resolve_vanity_url
+    from .history_utils import build_snapshot, save_history, load_latest_history, compare_snapshots, build_diff_text, save_diff_text
 
     for friend in cfg["friends"]:
         raw = friend["steamid"]
@@ -151,3 +152,33 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
                        cfg["cookie_file"],
                        cfg["debug"])
     export_styled_excel(df, cfg["friends"], cfg["output_path"], cfg["app_id"])
+
+    # Save history snapshot 
+    try:
+        save_history(cfg["app_id"], df, cfg["friends"])
+    except Exception as e:
+        log(f"⚠️ Failed to save history: {e}")
+
+    # === Save history ===
+    timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+    snapshot = build_snapshot(cfg["app_id"], df, cfg["friends"], timestamp)
+    prev = load_latest_history(cfg["app_id"])
+
+    import json
+    with open('test1.json', "w", encoding="utf-8") as f:
+        json.dump(snapshot, f, indent=2, ensure_ascii=False)
+    
+    with open('test2.json', "w", encoding="utf-8") as f:
+        json.dump(prev, f, indent=2, ensure_ascii=False)
+    save_history(cfg["app_id"], snapshot)
+
+    # === Compare ===
+    diff = compare_snapshots(prev, snapshot)
+    diff_text = build_diff_text(diff)
+
+    log("📊 Progress changes since last run:")
+    print(diff_text)
+
+    # Optional: save diff file
+    diff_file = save_diff_text(cfg["app_id"], diff_text)
+    log(f"📝 Diff saved to {diff_file}")
