@@ -104,10 +104,14 @@ class App:
         # === RUN BUTTON ===
         tk.Button(frm, text="Start Tracking", font=("Arial", 14),
                   command=self.start_tracking).grid(row=4, column=0, columnspan=3, pady=20)
+        
+        # Show graph over time
+        tk.Button(frm, text="Show Progress Graphs", font=("Arial", 12),
+          command=self.show_graphs).grid(row=5, column=0, columnspan=3, pady=10)
 
         # === Status area ===
-        tk.Label(frm, text="Status:").grid(row=5, column=0, sticky="w")
-        tk.Label(frm, textvariable=self.status_text, fg="blue").grid(row=6, column=0, columnspan=3, sticky="w")
+        tk.Label(frm, text="Status:").grid(row=6, column=0, sticky="w")
+        tk.Label(frm, textvariable=self.status_text, fg="blue").grid(row=7, column=0, columnspan=3, sticky="w")
 
     # ACTIONS BELOW
     def pick_config(self):
@@ -195,3 +199,48 @@ class App:
         except Exception as e:
             messagebox.showerror("Error", str(e))
             self.status_text.set("Error occurred.")
+
+    def show_graphs(self):
+        try:
+            # Load config.json first (needed to get app_id)
+            if not self.config_path.get():
+                messagebox.showerror("Error", "Choose config.json first.")
+                return
+
+            cfg = json.loads(Path(self.config_path.get()).read_text("utf-8"))
+            app_id = cfg.get("app_id")
+
+            if not app_id:
+                messagebox.showerror("Error", "Invalid config.json — missing app_id.")
+                return
+
+            from .history_utils import plot_progress, load_history
+
+            # Check if history exists
+            history = load_history(app_id)
+            if len(history) == 0:
+                messagebox.showwarning("No History", "No snapshots found for this game.\nRun the tracker first.")
+                return
+
+            # Build graphs
+            plot_progress(app_id)
+
+            # Open folder in OS
+            folder = Path("history") / str(app_id) / "graphs"
+            folder.mkdir(parents=True, exist_ok=True)
+
+            # Open directory (Windows / macOS / Linux)
+            import platform, subprocess
+
+            if platform.system() == "Windows":
+                subprocess.Popen(["explorer", str(folder.resolve())])
+            elif platform.system() == "Darwin":
+                subprocess.Popen(["open", str(folder.resolve())])
+            else:
+                subprocess.Popen(["xdg-open", str(folder.resolve())])
+
+            messagebox.showinfo("Done", "Graphs generated successfully!")
+
+        except Exception as e:
+            messagebox.showerror("Error generating graphs", str(e))
+
