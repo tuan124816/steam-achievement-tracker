@@ -15,6 +15,7 @@ import time
 import pandas as pd
 from pathlib import Path
 from typing import Dict, Any, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from .utils import log, warn, error, progress_bar
 from .fetchers import (
     fetch_schema, fetch_player_api,
@@ -66,55 +67,126 @@ def build_tracker(api_key: str, app_id: int, friends: List[Dict[str, Any]], cook
         **{f["name"]: False for f in friends}
     } for a in schema])
 
-    driver = None   # Selenium driver (lazy-loaded only if needed)
+    # driver = None   # Selenium driver (lazy-loaded only if needed)
 
-    # Loop through friends with progress bar
-    for friend in progress_bar(friends, desc="Friends"):
-        fname, fid = friend["name"], friend["steamid"]
-        log(f"Processing {fname}...")
-        unlocked_display = set()
+    # # Loop through friends with progress bar
+    # for friend in progress_bar(friends, desc="Friends"):
+    #     fname, fid = friend["name"], friend["steamid"]
+    #     log(f"Processing {fname}...")
+    #     unlocked_display = set()
+
+    #     try:
+    #         # Try API first
+    #         time.sleep(API_SLEEP)
+    #         api_data = fetch_player_api(api_key, app_id, fid)
+    #         if api_data:
+    #             unlocked_display = {
+    #                 apiname_to_display.get(k)
+    #                 for k, v in api_data.items() if v and apiname_to_display.get(k)
+    #             }
+    #         else:
+    #             # API returned no data, then likely private
+    #             raise ValueError("No API data, fallback to Selenium")
+            
+    #     except Exception:
+    #         # Selenium fallback (for private profiles)
+    #         warn(f"  ⚠️ API failed for {fname}, trying Selenium") if debug else None
+    #         if not driver:
+    #             driver = create_logged_in_driver(cookie_file)
+    #         time.sleep(HTML_SLEEP)
+    #         try:
+    #             unlocked_display = fetch_player_html_selenium(fid, app_id, driver, debug=debug)
+    #         except ValueError as e:
+    #             if "expired" not in str(e).lower():
+    #                 raise
+
+    #             error("⚠️  Selenium cookie error detected.")
+    #             error("Cookie file exists but is expired or invalid.")
+    #             log("🔄 Regenerating cookies…")
+
+    #             generate_steam_cookies(COOKIE_FILE)
+
+    #             driver = create_logged_in_driver(cookie_file)
+    #             unlocked_display = fetch_player_html_selenium(fid, app_id, driver, debug=debug)
+
+
+    #     # Mark unlocked achievements in DataFrame
+    #     df[fname] = df["Achievement name"].apply(lambda s: s in unlocked_display)
+    #     log(f"  → {len(unlocked_display)} unlocked")
+
+    # if driver:
+    #     driver.quit()
+
+    # return df
+    # --- STEP 1: API pass ---
+    selenium_queue = []     # (name, steamid)
+    api_results = {}        # name → unlocked_set
+
+    for friend in progress_bar(friends, desc="API Pass"):
+        fname = friend["name"]
+        fid = friend["steamid"]
 
         try:
-            # Try API first
             time.sleep(API_SLEEP)
             api_data = fetch_player_api(api_key, app_id, fid)
+
             if api_data:
-                unlocked_display = {
+                unlocked = {
                     apiname_to_display.get(k)
-                    for k, v in api_data.items() if v and apiname_to_display.get(k)
+                    for k, v in api_data.items()
+                    if v and apiname_to_display.get(k)
                 }
+                api_results[fname] = unlocked
             else:
-                # API returned no data, then likely private
-                raise ValueError("No API data, fallback to Selenium")
-            
+                selenium_queue.append((fname, fid))
+
         except Exception:
-            # Selenium fallback (for private profiles)
-            warn(f"  ⚠️ API failed for {fname}, trying Selenium") if debug else None
-            if not driver:
-                driver = create_logged_in_driver(cookie_file)
-            time.sleep(HTML_SLEEP)
+            selenium_queue.append((fname, fid))
+
+    # --- STEP 2: PARALLEL SELENIUM PASS ---
+    selenium_results = {}
+
+    if selenium_queue:
+        max_workers = min(4, len(selenium_queue))  # safe number of drivers
+        log(f"🌐 Launching {max_workers} Selenium workers...")
+
+        def worker(job):
+            fname, fid = job
+            driver = create_logged_in_driver(cookie_file)
             try:
-                unlocked_display = fetch_player_html_selenium(fid, app_id, driver, debug=debug)
+                time.sleep(HTML_SLEEP)
+                unlocked = fetch_player_html_selenium(fid, app_id, driver, debug=debug)
             except ValueError as e:
-                if "expired" not in str(e).lower():
-                    raise
+                # Cookie expired → regenerate once
+                if "expired" in str(e).lower():
+                    error("⚠️ Selenium cookie expired. Regenerating...")
+                    generate_steam_cookies(cookie_file)
+                    driver.quit()
 
-                error("⚠️  Selenium cookie error detected.")
-                error("Cookie file exists but is expired or invalid.")
-                log("🔄 Regenerating cookies…")
+                    driver = create_logged_in_driver(cookie_file)
+                    unlocked = fetch_player_html_selenium(fid, app_id, driver, debug=debug)
+                else:
+                    unlocked = set()
+            finally:
+                driver.quit()
+            return fname, unlocked
 
-                generate_steam_cookies(COOKIE_FILE)
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = [pool.submit(worker, job) for job in selenium_queue]
+            for f in as_completed(futures):
+                fname, unlocked = f.result()
+                selenium_results[fname] = unlocked
 
-                driver = create_logged_in_driver(cookie_file)
-                unlocked_display = fetch_player_html_selenium(fid, app_id, driver, debug=debug)
+    # --- STEP 3: Merge results into df ---
+    for friend in friends:
+        name = friend["name"]
 
+        if name in api_results:
+            unlocked = api_results[name]
+        else:
+            unlocked = selenium_results.get(name, set())
 
-        # Mark unlocked achievements in DataFrame
-        df[fname] = df["Achievement name"].apply(lambda s: s in unlocked_display)
-        log(f"  → {len(unlocked_display)} unlocked")
-
-    if driver:
-        driver.quit()
+        df[name] = df["Achievement name"].apply(lambda s: s in unlocked)
 
     return df
 
@@ -136,6 +208,7 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
     from .excel_utils import export_styled_excel
     from .steam_utils import resolve_vanity_url
     from .history_utils import build_snapshot, save_history, load_latest_history, compare_snapshots, build_diff_text, save_diff_text
+    from .history_utils import plot_progress
 
     for friend in cfg["friends"]:
         raw = friend["steamid"]
@@ -164,12 +237,12 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
     snapshot = build_snapshot(cfg["app_id"], df, cfg["friends"], timestamp)
     prev = load_latest_history(cfg["app_id"])
 
-    import json
-    with open('test1.json', "w", encoding="utf-8") as f:
-        json.dump(snapshot, f, indent=2, ensure_ascii=False)
+    # import json
+    # with open('test1.json', "w", encoding="utf-8") as f:
+    #     json.dump(snapshot, f, indent=2, ensure_ascii=False)
     
-    with open('test2.json', "w", encoding="utf-8") as f:
-        json.dump(prev, f, indent=2, ensure_ascii=False)
+    # with open('test2.json', "w", encoding="utf-8") as f:
+    #     json.dump(prev, f, indent=2, ensure_ascii=False)
     save_history(cfg["app_id"], snapshot)
 
     # === Compare ===
@@ -182,3 +255,6 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
     # Optional: save diff file
     diff_file = save_diff_text(cfg["app_id"], diff_text)
     log(f"📝 Diff saved to {diff_file}")
+
+    # Generate graphs after run
+    plot_progress(cfg["app_id"])
