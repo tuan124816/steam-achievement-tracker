@@ -21,7 +21,10 @@ from typing import Dict, Any, List, Set
 
 from .constants import HEADERS, API_SLEEP, HTML_SLEEP
 from .utils import log, warn, error, debug_save_html
-from .steam_cache import load_schema_from_cache, save_schema_to_cache, download_icon
+from .steam_cache import load_schema_from_cache, save_schema_to_cache, download_icon, load_gameinfo_from_cache, save_gameinfo_to_cache, save_game_image
+
+
+STEAM_APPDETAILS = "https://store.steampowered.com/api/appdetails?appids={}"
 
 
 def fetch_schema(api_key: str, app_id: int) -> List[Dict[str, str]]:
@@ -216,6 +219,86 @@ def fetch_player_html_selenium(steamid: str, app_id: int, driver: webdriver.Chro
             unlocked.add(title.get_text(strip=True))
 
     return unlocked
+
+
+def fetch_game_info(app_id: int) -> dict:
+    """
+    Fetch Steam game metadata.
+    Returns:
+        {
+            "name": "...",
+            "short_description": "...",
+            "header_image": URL,
+            "capsule_image": URL,
+            "library_image": URL
+        }
+    """
+    # 1. Try cache first
+    cached = load_gameinfo_from_cache(app_id)
+    if cached:
+        return cached
+
+    # 2. Fetch fresh from Steam store API
+    url = f"https://store.steampowered.com/api/appdetails?appids={app_id}&l=english"
+    r = requests.get(url, timeout=10).json()
+
+    data = r.get(str(app_id), {}).get("data", {})
+    info = {
+        "name": data.get("name"),
+        "short_description": data.get("short_description", ""),
+        "header_image": data.get("header_image"),
+        "capsule_image": data.get("capsule_image"),
+        "library_image": data.get("library_asset_600x900", data.get("library_logo"))
+    }
+
+    # 3. Save JSON to cache
+    save_gameinfo_to_cache(app_id, info)
+
+    # 4. Download images to cache
+    save_game_image(app_id, info["header_image"], "header.jpg")
+    save_game_image(app_id, info["capsule_image"], "capsule.jpg")
+    if info["library_image"]:
+        save_game_image(app_id, info["library_image"], "library.jpg")
+
+    return info
+
+
+def download_game_images(app_id: int, game_info: dict, target_dir) -> dict:
+    """
+    Download header/capsule images to a directory.
+
+    Returns file paths:
+    {
+        "header": Path | None,
+        "capsule": Path | None
+    }
+    """
+    import os
+    import pathlib
+
+    target = pathlib.Path(target_dir)
+    target.mkdir(parents=True, exist_ok=True)
+
+    results = {"header": None, "capsule": None}
+
+    def _download(url: str, filename: str):
+        if not url:
+            return None
+        try:
+            r = requests.get(url, timeout=10)
+            if r.status_code != 200:
+                return None
+            path = target / filename
+            with open(path, "wb") as f:
+                f.write(r.content)
+            return path
+        except Exception:
+            return None
+
+    results["header"] = _download(game_info.get("header_url"), "header.jpg")
+    results["capsule"] = _download(game_info.get("capsule_url"), "capsule.jpg")
+
+    return results
 
 
 if __name__ == "__main__":

@@ -19,7 +19,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .utils import log, warn, error, progress_bar
 from .fetchers import (
     fetch_schema, fetch_player_api,
-    fetch_player_html_selenium, create_logged_in_driver
+    fetch_player_html_selenium, create_logged_in_driver,
+    fetch_game_info
 )
 from .constants import API_SLEEP, HTML_SLEEP
 from .cookie_setup import generate_steam_cookies
@@ -207,8 +208,8 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
     """
     from .excel_utils import export_styled_excel
     from .steam_utils import resolve_vanity_url
-    from .history_utils import build_snapshot, save_history, load_latest_history, compare_snapshots, build_diff_text, save_diff_text
-    from .history_utils import plot_progress
+    from .history_utils import build_snapshot, save_history, load_latest_history, compare_snapshots, build_diff_text, save_diff_text, plot_progress
+    from .player_compare import generate_all_comparison_charts
 
     for friend in cfg["friends"]:
         raw = friend["steamid"]
@@ -224,6 +225,8 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
                        cfg["friends"], 
                        cfg["cookie_file"],
                        cfg["debug"])
+    gameinfo = fetch_game_info(cfg["app_id"])
+    log(f"🎮 Game: {gameinfo['name']}")
     export_styled_excel(df, cfg["friends"], cfg["output_path"], cfg["app_id"])
 
     # Save history snapshot 
@@ -258,3 +261,12 @@ def run_tracker(cfg: Dict[str, Any]) -> None:
 
     # Generate graphs after run
     plot_progress(cfg["app_id"])
+
+    # === Generate charts ===
+    try:
+        theme = cfg.get("chart_theme", "light")
+        charts = generate_all_comparison_charts(df, cfg["friends"], cfg["app_id"], theme=theme)
+        for p in charts:
+            log(f"Chart saved: {p}")
+    except Exception as e:
+        log(f"⚠️ Chart generation failed: {e}")
