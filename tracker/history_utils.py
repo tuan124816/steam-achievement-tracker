@@ -19,10 +19,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import matplotlib.pyplot as plt
-
 import pandas as pd
-
 from .utils import log
+from .font_utils import setup_unicode_font, detect_unsupported_glyphs, print_unsupported_report
+
+
+plt.rcParams['font.sans-serif'] = ['MS Gothic']  
+plt.rcParams['axes.unicode_minus'] = False
 
 HISTORY_ROOT = Path("history")
 
@@ -252,11 +255,32 @@ def build_snapshot(app_id: int, df: pd.DataFrame, friends: list, run_timestamp: 
     return snapshot
 
 
+def debug_find_non_ascii(snapshot):
+    print("\n=== Unicode Debug Scan ===")
+
+    def scan_text(label, text):
+        bad_chars = [c for c in text if ord(c) > 127]
+        if bad_chars:
+            print(f"{label}: '{text}'")
+            print("  Non-ASCII chars:", bad_chars)
+
+    # Scan friends' names + achievements
+    for friend, info in snapshot["friends"].items():
+        scan_text("Friend Name", friend)
+        for ach in info["achievements"]:
+            scan_text(f"Achievement for {friend}", ach)
+
+    print("=== End Unicode Scan ===\n")
+
+
+
 def plot_progress(app_id: int, history_dir: Path | None = None) -> None:
     """
     Generate progress graphs for each friend based on history snapshots.
     Saves PNG graphs into history/<app_id>/graphs/
     """
+    setup_unicode_font()
+
     app_dir = _ensure_app_dir(app_id, history_dir)
     graph_dir = app_dir / "graphs"
     graph_dir.mkdir(parents=True, exist_ok=True)
@@ -269,12 +293,21 @@ def plot_progress(app_id: int, history_dir: Path | None = None) -> None:
 
     # Collect timeline of achievement counts per friend
     timeline = {}  # { friend_name: [(timestamp, count), ...] }
+    names = [] # for detect_unsupported_glyphs function
+
+    # # DEBUG: find Unicode characters that may break matplotlib
+    # debug_find_non_ascii(snapshots[-1])
 
     for snap in snapshots:
         ts = snap["timestamp"]
         for friend, data in snap["friends"].items():
+            names.append(friend)
             unlocked = data.get("unlocked", 0)
             timeline.setdefault(friend, []).append((ts, unlocked))
+
+    # perform glyph check
+    unsupported = detect_unsupported_glyphs(names)
+    print_unsupported_report(unsupported)
 
     # Plot each friend's graph
     for friend, entries in timeline.items():
