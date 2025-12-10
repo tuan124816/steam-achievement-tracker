@@ -274,11 +274,29 @@ def debug_find_non_ascii(snapshot):
 
 
 
-def plot_progress(app_id: int, history_dir: Path | None = None) -> None:
+def plot_progress(app_id: int, history_dir: Path | None = None,
+                  theme: dict | None = None) -> None:
     """
-    Generate progress graphs for each friend based on history snapshots.
-    Saves PNG graphs into history/<app_id>/graphs/
+    Generate progress graphs using optional theme colors.
+    Saves PNG graphs into history/<app_id>/graphs/.
     """
+
+    # Default color scheme (matches your old graphs)
+    default_theme = {
+        "bg": "white",
+        "fg": "black",
+        "line": "#1f77b4",     # matplotlib default blue
+        "title": "black"
+    }
+
+    # Merge theme with defaults
+    if theme is None:
+        theme = default_theme
+    else:
+        merged = default_theme.copy()
+        merged.update(theme)
+        theme = merged
+
     setup_unicode_font()
 
     app_dir = _ensure_app_dir(app_id, history_dir)
@@ -286,17 +304,12 @@ def plot_progress(app_id: int, history_dir: Path | None = None) -> None:
     graph_dir.mkdir(parents=True, exist_ok=True)
 
     snapshots = load_history(app_id, history_dir)
-
     if not snapshots:
         print("📭 No history found — nothing to plot.")
         return
 
-    # Collect timeline of achievement counts per friend
-    timeline = {}  # { friend_name: [(timestamp, count), ...] }
-    names = [] # for detect_unsupported_glyphs function
-
-    # # DEBUG: find Unicode characters that may break matplotlib
-    # debug_find_non_ascii(snapshots[-1])
+    timeline = {}
+    names = []
 
     for snap in snapshots:
         ts = snap["timestamp"]
@@ -305,23 +318,27 @@ def plot_progress(app_id: int, history_dir: Path | None = None) -> None:
             unlocked = data.get("unlocked", 0)
             timeline.setdefault(friend, []).append((ts, unlocked))
 
-    # perform glyph check
     unsupported = detect_unsupported_glyphs(names)
     print_unsupported_report(unsupported)
 
-    # Plot each friend's graph
+    # Plot each friend
     for friend, entries in timeline.items():
-        # Sort by timestamp
         entries = sorted(entries, key=lambda x: x[0])
         x = [ts for ts, _ in entries]
         y = [count for _, count in entries]
 
-        plt.figure(figsize=(8,4))
-        plt.plot(x, y, marker="o")
-        plt.xticks(rotation=45, ha="right")
-        plt.title(f"{friend} — Achievement Progress")
-        plt.xlabel("Time")
-        plt.ylabel("Unlocked achievements")
+        plt.figure(figsize=(8, 4))
+        plt.rcParams['axes.facecolor'] = theme["bg"]
+        plt.rcParams['figure.facecolor'] = theme["bg"]
+
+        plt.plot(x, y, marker="o", color=theme["line"])
+        plt.xticks(rotation=45, ha="right", color=theme["fg"])
+        plt.yticks(color=theme["fg"])
+
+        plt.title(f"{friend} — Achievement Progress", color=theme["title"])
+        plt.xlabel("Time", color=theme["fg"])
+        plt.ylabel("Unlocked achievements", color=theme["fg"])
+
         plt.tight_layout()
 
         out = graph_dir / f"{friend}.png"
