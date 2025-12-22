@@ -14,6 +14,7 @@ from typing import List, Dict, Any
 # But run_tracker expects a config dict. We'll call it inside a background task.
 from tracker.main import run_tracker  # <- adjust if needed
 from backend.app.api.health import router as health_router
+from backend.app.services.excel_parser import parse_achievement_excel
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -179,3 +180,49 @@ async def websocket_logs(ws: WebSocket, job_id: str):
                 await asyncio.sleep(1)
     except WebSocketDisconnect:
         _websocket_connections.remove(ws)
+
+
+
+@app.get("/api/friends")
+async def list_friends(filename: str = "config.json"):
+    p = UPLOAD_DIR / filename
+    if not p.exists():
+        raise HTTPException(404, "Config not found")
+
+    cfg = json.loads(p.read_text(encoding="utf-8"))
+    return cfg.get("friends", [])
+
+
+@app.post("/api/friends")
+async def add_friend(friend: dict, filename: str = "config.json"):
+    p = UPLOAD_DIR / filename
+    if not p.exists():
+        raise HTTPException(404, "Config not found")
+
+    cfg = json.loads(p.read_text(encoding="utf-8"))
+    cfg.setdefault("friends", []).append(friend)
+
+    p.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+    return cfg["friends"]
+
+
+@app.delete("/api/friends/{steam_id}")
+async def remove_friend(steam_id: str, filename: str = "config.json"):
+    p = UPLOAD_DIR / filename
+    if not p.exists():
+        raise HTTPException(404, "Config not found")
+
+    cfg = json.loads(p.read_text(encoding="utf-8"))
+    cfg["friends"] = [f for f in cfg.get("friends", []) if f.get("steam_id") != steam_id]
+
+    p.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+    return cfg["friends"]
+
+
+@app.get("/api/stats")
+async def get_stats(filename: str):
+    p = Path(filename)
+    if not p.exists():
+        raise HTTPException(404, "Excel not found")
+
+    return parse_achievement_excel(p)
